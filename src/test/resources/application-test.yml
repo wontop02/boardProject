@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb  # H2 in-memory DB 설정
+    #url: jdbc:h2:file:C:\board_project\target\testdb # file 모드로 변경해 데이터를 파일에 저장
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  jpa:
+    hibernate:
+      ddl-auto: create
+    database-platform: org.hibernate.dialect.H2Dialect  # H2 전용 dialect
+  h2:
+    console:
+      enabled: true  # H2 콘솔 활성화
