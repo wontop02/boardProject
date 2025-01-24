@@ -14,6 +14,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     //값이 존재하면 Optional은 해당 값 포함, 없으면 비어 있는 empty 상태
     User findByUsername(String username);
 
+    //Optional 없이 id로 찾기
+    User findUserById(Long id);
+
     //아이디 존재 여부 확인
     boolean existsByUsername(String username);
+
+    void deleteByUsername(String username);
+
 }
