@@ -3,20 +3,28 @@ package com.wontop.board_project.service;
 import com.wontop.board_project.dto.UserDto;
 import com.wontop.board_project.dto.UserRequest;
 import com.wontop.board_project.entity.User;
+import com.wontop.board_project.jwt.JwtTokenProvider;
 import com.wontop.board_project.repository.UserRepository;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
+@Transactional
 public class UserService {
     private final UserRepository userRepository;
-
-    @Autowired
-    public UserService(UserRepository userRepository){
-        this.userRepository = userRepository;
-    }
+    private final JwtTokenProvider jwtTokenProvider;
 
     public UserDto createUser(UserRequest userRequest){
         String username = userRequest.getUsername();
@@ -41,60 +49,69 @@ public class UserService {
         User user = User.builder()
             .username(userRequest.getUsername())
             .password(userRequest.getPassword())
+            .roles(new ArrayList<>(List.of("ROLE_USER"))) //role 넣어줌
             .build();
+
+        //role 종류
+        //ROLE_USER,
+        //ROLE_ADMIN,
+        //ROLE_MANAGER
 
         userRepository.save(user);
 
         return user.toDto();
     }
-    public UserDto login(UserRequest userRequest){
+    public String login(UserRequest userRequest){
+        String username = userRequest.getUsername();
+        String password = userRequest.getPassword();
         //1. 아이디로 사용자 조회
-        User user = userRepository.findByUsername(userRequest.getUsername());
+        User user = userRepository.findByUsername(username);
 
         if (user == null){
             throw new IllegalArgumentException("사용자가 존재하지 않습니다.");
         }
 
         //2. 비밀번호 검증
-        if (!user.checkPasswordRight(userRequest.getPassword())){
+        if (!user.checkPasswordRight(password)){
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
-        //모두 통과하면
-        return user.toDto();
+        // 3. 사용자 역할(Role) 가져오기
+        List<String> roles = user.getAuthorities().stream()
+            .map(GrantedAuthority::getAuthority)  // GrantedAuthority에서 실제 권한(문자열)을 추출
+            .collect(Collectors.toList());
+
+        //인증이 완료되었으므로 따로 인증 없이 JWT 생성
+        return jwtTokenProvider.generateToken(username, roles);  // 로그인 시 JWT 반환
     }
-
-    public void ReadUser(){
-
-    }
-
-/*    //로그인 되어 있는 상태에서만 사용, id와 username은 frontend에서 로그인 된 정보로 받음
-    public void updateUserPassword(Long id, String username, String currentPassword, String newPassword){
-        User currentUser = userRepository.findUserById(id);
-        if(currentUser.checkPasswordRight(currentPassword)){
-            User newUser = User.builder()
-                .id(id)
-                .username(username)
-                .password(newPassword)
-                .build();
-            userRepository.save(newUser);
-        }
-        else{
-            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
-        }
-    }*/
 
     //사용자 이름으로 사용자 찾기
-/*    public User findByUsername(String username) {
-        return userRepository.findByUsername(username);
-    }*/
 
-    public void deleteUser(Long id) {
-        User user = userRepository.findUserById(id);
-        if (user != null) {
-            userRepository.delete(user);
-        } else {
-            throw new RuntimeException("User not found");
-        }
+    public User findByUsername(String username) {
+    return userRepository.findByUsername(username);
     }
+
+    public User findUserById(Long id) {
+        return userRepository.findUserById(id);
+    }
+
+    public void deleteUser(Long userId, Authentication authentication) {
+        // Spring Security User 객체를 커스텀 User 객체로 변환
+        org.springframework.security.core.userdetails.User springUser = (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
+
+        // springUser에서 username을 가져와서 커스텀 User를 조회
+        com.wontop.board_project.entity.User authenticatedUser = userRepository.findByUsername(springUser.getUsername());
+
+        if (authenticatedUser == null) {
+            throw new IllegalArgumentException("사용자를 찾을 수 없습니다.");
+        }
+
+        // 인증된 사용자가 자신을 삭제하려는지 확인
+        if (!authenticatedUser.equalsId(userId)) {
+            throw new AccessDeniedException("자신의 계정만 삭제할 수 있습니다.");
+        }
+
+        userRepository.delete(authenticatedUser);
+    }
+
 }

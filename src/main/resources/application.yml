@@ -11,3 +11,5 @@ spring:
       format_sql: true
     hibernate:
       ddl-auto: validate
+jwt:
+  secret: VxgHIGm1gKsFjpHq8OkRGBHR4MgE9iCrEBcDCdGGEmQ=

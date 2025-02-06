@@ -1,5 +1,6 @@
 package com.wontop.board_project.entity;
 
+import com.wontop.board_project.dto.LikeDto;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +10,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(name = "`like`", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"user_id", "post_id"})  // 중복 방지
+})
 public class Like {
 
     @Id
@@ -22,4 +26,12 @@ public class Like {
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
+
+    public LikeDto toDto() {
+        return LikeDto.builder()
+            .id(this.id)
+            .postDto(post.toDto())
+            .userDto(user.toDto())
+            .build();
+    }
 }
